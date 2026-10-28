@@ -184,16 +184,23 @@ def classify_intent(state: SupportState):
 # 7. RETRIEVAL NODE
 # ============================================================
 def retrieve_context(state: SupportState):
-    """
-    Retrieve relevant FAQ chunks using FAISS.
-    """
+    """Retrieve relevant FAQ chunks using FAISS."""
+
+    if retriever is None:
+        raise RuntimeError("Knowledge base is not initialized.")
+
     documents = retriever.invoke(state["search_query"])
-    context = "\n\n".join(document.page_content for document in documents)
+    context = "\n\n".join(
+        document.page_content for document in documents
+    )
+
     sources = list(
         dict.fromkeys(
-            document.metadata.get("source", "unknown") for document in documents
+            document.metadata.get("source", "unknown")
+            for document in documents
         )
     )
+
     return {"context": context, "sources": sources}
 
 
@@ -355,14 +362,19 @@ def ask_support(question: str):
 # ============================================================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Initialize the application and log the configured Groq model.
-    The embedding model, FAISS index, and graph are initialized
-    at module import time and reused across requests.
-    """
+    """Initialize the knowledge base during application startup."""
+
     logger.info("Starting Customer Support RAG API.")
-    logger.info("Groq client configured. Model: %s", GROQ_MODEL)
+
+    try:
+        initialize_knowledge_base()
+        logger.info("Knowledge base initialization completed.")
+    except Exception:
+        logger.exception("Knowledge base initialization failed.")
+        raise
+
     yield
+
     logger.info("Shutting down Customer Support RAG API.")
 
 
